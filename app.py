@@ -1,70 +1,38 @@
-import json
-import os
+from flask import Flask, jsonify, request 
 from datetime import datetime
-from flask import Flask, jsonify, request
+import json, os
 
 app = Flask(__name__)
+DB = 'peritajes.json'
 
-RUTA_JSON = '/var/www/html/peritajes.json'
+def handle_db(data=None):
+    if data is None:
+        return json.load(open(DB)) if os.path.exists(DB) else []
+    with open(DB, 'w') as f:
+        json.dump(data, f)
 
+@app.route('/api/peritajes', methods=['GET','POST'])
+def peritajes():
 
-def cargar_datos():
-    if not os.path.exists(RUTA_JSON):
-        return []
-    with open(RUTA_JSON, 'r') as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            return []
+    datos = handle_db()
 
-def guardar_datos(datos):
-    with open(RUTA_JSON, 'w') as f:
-        json.dump(datos, f, indent=4)
+    if request.method == 'POST':
 
-@app.route('/api/peritajes', methods=['GET'])
-def listar_peritajes():
-    datos = cargar_datos()
-    return jsonify(datos), 200
+        nuevo = request.get_json()
 
+        # HOTFIX DE PRODUCCION
+        if 'placa' in nuevo:
+            nuevo['placa'] = nuevo['placa'].upper()
 
-@app.route('/api/peritajes', methods=['POST'])
-def registrar_peritaje():
-    nueva_moto = request.get_json()
-    if not nueva_moto or 'placa' not in nueva_moto:
-        return jsonify({"error": "Formato inválido"}), 400
-    
-    datos = cargar_datos()
-    datos.append(nueva_moto)
-    guardar_datos(datos)
-    
-    return jsonify({
-        "message": f"Vehículo {nueva_moto['placa']} registrado con éxito",
-        "datos": nueva_moto
-    }), 201
+        nuevo['fecha'] = datetime.now().strftime("%H:%M:%S")
 
+        datos.append(nuevo)
 
-@app.route('/api/peritajes/<placa>', methods=['DELETE'])
-def eliminar_peritaje(placa):
-    datos = cargar_datos()
-    nueva_lista = [m for m in datos if m['placa'] != placa]
-    
-    if len(nueva_lista) == len(datos):
-        return jsonify({"error": "Placa no encontrada"}), 404
-    
-    guardar_datos(nueva_lista)
-    
-    return jsonify({
-        "message": f"Vehículo {placa} entregado al cliente con éxito",
-        "moto_removida": {"placa": placa}
-    }), 200
+        handle_db(datos)
 
+        return jsonify({"msj": "OK"}), 201
 
-@app.route('/api/registros', methods=['GET'])
-def obtener_registros():
-    return jsonify({
-        "servidor": "Servidor-TuApellido",
-        "fecha_hora_servidor": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }), 200
+    return jsonify(datos)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=8000)
