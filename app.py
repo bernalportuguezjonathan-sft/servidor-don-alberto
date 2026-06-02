@@ -1,38 +1,41 @@
-from flask import Flask, jsonify, request 
+from flask import Flask, request, jsonify
 from datetime import datetime
-import json, os
+import socket
 
 app = Flask(__name__)
-DB = 'peritajes.json'
 
-def handle_db(data=None):
-    if data is None:
-        return json.load(open(DB)) if os.path.exists(DB) else []
-    with open(DB, 'w') as f:
-        json.dump(data, f)
+registros = {
+    "servidor": "portuguez-server",
+    "hora_servidor": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "inventario": [
+        {"placa": "ABC123", "modelo": "Yamaha FZ", "color": "Negro"},
+        {"placa": "XYZ789", "modelo": "Honda CB190R", "color": "Rojo"}
+    ]
+}
 
-@app.route('/api/peritajes', methods=['GET','POST'])
-def peritajes():
+peritajes = [{"placa": "NSRS3057"}]
 
-    datos = handle_db()
+@app.route('/api/registros', methods=['GET'])
+def obtener_registros():
+    return jsonify(registros)
 
-    if request.method == 'POST':
+@app.route('/api/peritajes', methods=['GET'])
+def obtener_peritajes():
+    return jsonify(peritajes)
 
-        nuevo = request.get_json()
+@app.route('/api/inventario', methods=['GET'])
+def inventario():
+    return jsonify({
+        "mensaje": "Inventario en desarrollo",
+        "repuestos": ["Aceite", "Bujias", "Filtros"]
+    })
 
-        # HOTFIX DE PRODUCCION
-        if 'placa' in nuevo:
-            nuevo['placa'] = nuevo['placa'].upper()
+@app.route('/api/peritajes', methods=['POST'])
+def registrar_peritaje():
+    data = request.json
+    nueva_moto = {"placa": data["placa"].upper()}
+    peritajes.append(nueva_moto)
+    return jsonify({"mensaje": "Peritaje registrado con éxito", "moto": nueva_moto}), 201
 
-        nuevo['fecha'] = datetime.now().strftime("%H:%M:%S")
-
-        datos.append(nuevo)
-
-        handle_db(datos)
-
-        return jsonify({"msj": "OK"}), 201
-
-    return jsonify(datos)
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8000)
+if __name__ == '__main__':
+    app.run(debug=False, host='0.0.0.0', port=5000)
